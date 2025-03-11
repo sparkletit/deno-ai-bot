@@ -13,7 +13,6 @@ class OpenAIService {
   private client: OpenAI;
   private maxRetries: number;
   private timeout: number;
-  private mockMode: boolean;
 
   constructor() {
     // 从环境变量获取配置
@@ -27,15 +26,12 @@ class OpenAIService {
     const timeoutStr = Deno.env.get("API_TIMEOUT");
     // @ts-ignore
     const maxRetriesStr = Deno.env.get("API_MAX_RETRIES");
-    // @ts-ignore
-    const mockModeStr = Deno.env.get("API_MOCK_MODE");
     
     // 设置默认值
     this.timeout = timeoutStr ? parseInt(timeoutStr) : 60000;
     this.maxRetries = maxRetriesStr ? parseInt(maxRetriesStr) : 3;
-    this.mockMode = mockModeStr === "true";
     
-    if (!apiKey && !this.mockMode) {
+    if (!apiKey) {
       throw new Error("OPENAI_API_KEY环境变量未设置");
     }
     
@@ -44,17 +40,49 @@ class OpenAIService {
     console.log(`代理设置: ${httpProxy || "未使用代理"}`);
     console.log(`超时设置: ${this.timeout}ms`);
     console.log(`最大重试次数: ${this.maxRetries}`);
-    console.log(`模拟响应模式: ${this.mockMode ? "启用" : "禁用"}`);
     
-    // 如果不是模拟模式，则创建真实的客户端
-    if (!this.mockMode) {
-      this.client = new OpenAI({
-        apiKey,
-        baseURL: baseURL || undefined,
-        timeout: this.timeout,
-        maxRetries: this.maxRetries
-      });
+    // 设置代理
+    let fetchImplementation = fetch;
+    
+    if (httpProxy) {
+      try {
+        console.log(`尝试设置代理: ${httpProxy}`);
+        
+        // 直接设置环境变量，这样Deno的fetch会自动使用代理
+        // @ts-ignore
+        Deno.env.set("HTTP_PROXY", httpProxy);
+        // @ts-ignore
+        Deno.env.set("HTTPS_PROXY", httpProxy);
+        
+        console.log("环境变量代理设置完成");
+        
+        // 创建一个自定义的fetch函数，用于记录请求信息
+        fetchImplementation = async (url: RequestInfo | URL, init?: RequestInit) => {
+          console.log(`发送请求到: ${url.toString()}`);
+          console.log(`使用环境变量代理: ${httpProxy}`);
+          
+          try {
+            const response = await fetch(url, init);
+            console.log(`请求成功，状态码: ${response.status}`);
+            return response;
+          } catch (error) {
+            console.error(`请求失败: ${error.message}`);
+            throw error;
+          }
+        };
+      } catch (error) {
+        console.error(`设置代理失败: ${error.message}`);
+      }
     }
+    
+    // 配置OpenAI客户端
+    this.client = new OpenAI({
+      apiKey,
+      baseURL: baseURL || undefined,
+      timeout: this.timeout,
+      maxRetries: this.maxRetries,
+      fetch: fetchImplementation
+    });
   }
 
   // 添加重试函数
@@ -79,39 +107,12 @@ class OpenAIService {
     throw lastError;
   }
 
-  // 生成模拟响应
-  private generateMockResponse(messages: ChatCompletionMessageParam[]) {
-    console.log("使用模拟响应模式");
-    
-    // 获取用户消息
-    const userMessage = messages.find(msg => msg.role === "user")?.content || "";
-    console.log(`用户消息: ${userMessage}`);
-    
-    // 生成模拟响应
-    return {
-      role: "assistant",
-      content: `这是一个模拟响应。您的输入是: "${userMessage}"\n\n由于当前处于模拟模式，API并未实际调用。这个响应是预设的，用于测试目的。`
-    };
-  }
-
   async createChatCompletionWithPlainText(messages: ChatCompletionMessageParam[]) {
     try {
       console.log("开始请求AI服务...");
       // @ts-ignore
       console.log(`请求模型: ${Deno.env.get("OPENAI_MODEL") || "grok-2-latest"}`);
       const startTime = Date.now();
-      
-      // 如果是模拟模式，返回模拟响应
-      if (this.mockMode) {
-        // 模拟网络延迟
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const mockResponse = this.generateMockResponse(messages);
-        
-        const endTime = Date.now();
-        console.log(`模拟响应时间: ${endTime - startTime}ms`);
-        
-        return mockResponse;
-      }
       
       // 真实API调用
       // @ts-ignore - 忽略类型错误
@@ -139,19 +140,6 @@ class OpenAIService {
     try {
       console.log("开始流式请求AI服务...");
       const startTime = Date.now();
-      
-      // 如果是模拟模式，返回模拟响应
-      if (this.mockMode) {
-        const mockResponse = this.generateMockResponse(messages);
-        
-        // 模拟流式响应
-        const content = mockResponse.content.split(" ");
-        
-        const endTime = Date.now();
-        console.log(`模拟流式响应时间: ${endTime - startTime}ms`);
-        
-        return content;
-      }
       
       // 真实API调用
       // @ts-ignore - 忽略类型错误
