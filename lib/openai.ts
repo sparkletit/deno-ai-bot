@@ -31,7 +31,7 @@ class OpenAIService {
       apiKey,
       baseURL: baseURL || undefined,
       // @ts-ignore
-      httpAgent: httpProxy ? new HttpsProxyAgent.HttpsProxyAgent(httpProxy) : undefined,
+      httpAgent: httpProxy ? new HttpsProxyAgent(httpProxy) : undefined,
     });
   }
 
