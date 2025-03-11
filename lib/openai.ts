@@ -2,7 +2,7 @@
 // @ts-ignore - 忽略所有Deno相关类型错误
 import { OpenAI } from "npm:openai@4.20.1";
 // @ts-ignore - 忽略代理相关类型错误
-import { HttpsProxyAgent } from "npm:https-proxy-agent";
+import HttpsProxyAgent from "npm:https-proxy-agent";
 
 // 定义消息类型
 export interface ChatCompletionMessageParam {
@@ -31,7 +31,7 @@ class OpenAIService {
       apiKey,
       baseURL: baseURL || undefined,
       // @ts-ignore
-      httpAgent: httpProxy ? new HttpsProxyAgent(httpProxy) : undefined,
+      httpAgent: httpProxy ? new HttpsProxyAgent.HttpsProxyAgent(httpProxy) : undefined,
     });
   }
 
