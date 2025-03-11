@@ -4,7 +4,15 @@ import OpenAIService from "../../../lib/openai.ts";
 export const handler: Handlers = {
   async POST(req) {
     try {
-      const { message } = await req.json();
+      const body = await req.json();
+      console.log("收到请求体:", JSON.stringify(body));
+      
+      const message = body.message;
+      console.log("提取的message:", message, "类型:", typeof message);
+      
+      if (message === undefined || message === null) {
+        throw new Error('请求中缺少message字段');
+      }
       
       // 创建OpenAI服务实例
       const service = new OpenAIService();
@@ -26,10 +34,13 @@ export const handler: Handlers = {
       if (typeof message === 'string') {
         // 如果message是字符串，直接使用
         userPrompt = message;
-      } else if (typeof message === 'object') {
+        console.log("使用字符串message:", userPrompt);
+      } else if (message && typeof message === 'object') {
         // 如果message是对象，转换为JSON字符串
         userPrompt = JSON.stringify(message);
+        console.log("使用对象message:", userPrompt);
       } else {
+        console.error("无效的message类型:", typeof message, "值:", message);
         throw new Error('无效的message格式，请提供字符串或对象');
       }
 
